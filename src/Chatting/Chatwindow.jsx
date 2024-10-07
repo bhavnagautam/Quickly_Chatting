@@ -170,10 +170,9 @@
 
 // export default ChatWindow;
 
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import GroupChatMenu from "../Chattinglist/GroupChatMenu";
+import GroupChatMenu from "../Chattinglist/GroupChatMenu"; // Ensure you import this component if needed
 
 const ChatWindow = ({ selectedUser, isGroupChat }) => {
   const [messagesMap, setMessagesMap] = useState({}); // Store chat history per user or group
@@ -190,8 +189,6 @@ const ChatWindow = ({ selectedUser, isGroupChat }) => {
         ? `wss://quick-chat-staging-bt9wd.ondigitalocean.app?userId=${senderId}&groupId=${selectedUser._id}`
         : `wss://quick-chat-staging-bt9wd.ondigitalocean.app?userId=${senderId}&receiverId=${selectedUser._id}`;
 
-      console.log("WebSocket URL:", websocketURL); // Debugging the WebSocket URL
-
       if (!socketRef.current) {
         socketRef.current = new WebSocket(websocketURL);
 
@@ -199,13 +196,13 @@ const ChatWindow = ({ selectedUser, isGroupChat }) => {
           console.log("WebSocket connection established");
 
           // Request chat history when the connection is opened
-          const historyRequest = {
-            type: isGroupChat ? "group_history" : "1to1_history",
-            userId: senderId,
-            [isGroupChat ? "groupId" : "receiverId"]: selectedUser._id,
-          };
-          console.log("Requesting chat history:", historyRequest); // Debugging the history request
-          socketRef.current.send(JSON.stringify(historyRequest));
+          socketRef.current.send(
+            JSON.stringify({
+              type: isGroupChat ? "group_history" : "1to1_history",
+              userId: senderId,
+              [isGroupChat ? "groupId" : "receiverId"]: selectedUser._id,
+            })
+          );
         };
 
         socketRef.current.onerror = (error) => {
@@ -214,21 +211,20 @@ const ChatWindow = ({ selectedUser, isGroupChat }) => {
 
         socketRef.current.onmessage = (event) => {
           const receivedMessage = JSON.parse(event.data);
-          console.log("Received WebSocket message:", receivedMessage); // Debugging received message
+          console.log("Received message:", receivedMessage); // Debug log
 
           if (receivedMessage.type === (isGroupChat ? "group_history" : "1to1_history")) {
             // Handle chat history for selected user or group
-            console.log("Received chat history:", receivedMessage.messages); // Debugging chat history
             setMessagesMap((prevMessagesMap) => ({
               ...prevMessagesMap,
               [selectedUser._id]: receivedMessage.messages,
             }));
           } else if (
-            (!isGroupChat && receivedMessage.sender === selectedUser._id) || // 1-to-1 message from selected user
-            (isGroupChat && receivedMessage.groupId === selectedUser._id) // Group message for the current group
+            (receivedMessage.sender === senderId && !isGroupChat) ||
+            (receivedMessage.receiver === senderId && !isGroupChat) ||
+            (receivedMessage.groupId === selectedUser._id && isGroupChat)
           ) {
             // Handle real-time chat messages for the current user or group
-            console.log("New chat message received:", receivedMessage); // Debugging new messages
             setMessagesMap((prevMessagesMap) => ({
               ...prevMessagesMap,
               [selectedUser._id]: [
@@ -243,6 +239,7 @@ const ChatWindow = ({ selectedUser, isGroupChat }) => {
 
     return () => {
       if (socketRef.current) {
+        console.log("Closing WebSocket connection");
         socketRef.current.close();
         socketRef.current = null;
       }
@@ -263,11 +260,10 @@ const ChatWindow = ({ selectedUser, isGroupChat }) => {
     if (message.trim() && socketRef.current?.readyState === WebSocket.OPEN) {
       const messageData = {
         sender: senderId,
+        [isGroupChat ? "groupId" : "receiverId"]: selectedUser._id, // Correct key based on chat type
         content: message,
-        [isGroupChat ? "groupId" : "receiver"]: selectedUser._id,
       };
-      console.log("Sending message:", messageData); // Debugging message send
-
+      console.log("Sending message:", messageData); // Debug log
       socketRef.current.send(JSON.stringify(messageData));
 
       // Update the messages map with the new message
@@ -280,6 +276,8 @@ const ChatWindow = ({ selectedUser, isGroupChat }) => {
       }));
 
       setMessage(""); // Clear the input field after sending the message
+    } else {
+      console.warn("WebSocket not open or message is empty"); // Debug log for errors
     }
   };
 

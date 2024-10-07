@@ -278,6 +278,7 @@ import { useSelector } from "react-redux";
 
 const ChatField = () => {
   const [selectedUser, setSelectedUser] = useState(null);
+  const [isGroupChat,setIsGroupChat] = useState(null);
   const isAuthenticated = useSelector((state) => state.isAuthenticated);
 
   if (!isAuthenticated) {
@@ -287,12 +288,12 @@ const ChatField = () => {
   return (
     <div className="flex h-screen">
       {/* User List */}
-      <UserList setSelectedUser={setSelectedUser} />
+      <UserList setSelectedUser={setSelectedUser} setIsGroupChat={setIsGroupChat}/>
       {/* Chat Window */}
       <Chatwindow selectedUser={selectedUser} setSelectedUser={setSelectedUser}
+      isGroupChat={isGroupChat} setIsGroupChat={setIsGroupChat}
       />
     </div>
   );
 };
-
 export default ChatField;
